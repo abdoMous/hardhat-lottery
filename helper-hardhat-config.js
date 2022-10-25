@@ -15,6 +15,7 @@ const networkConfig = {
         fundAmount: "1000000000000000000",
         automationUpdateInterval: "30",
         ethUsdPriceFeed: "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+        raffleEntranceFee: "10000000000000000", // 0.01 ether
     },
     1: {
         name: "mainnet",
@@ -33,6 +34,8 @@ const networkConfig = {
         fee: "100000000000000000",
         fundAmount: "100000000000000000", // 0.1
         automationUpdateInterval: "30",
+        subscriptionId: "5403",
+        raffleEntranceFee: "10000000000000000", // 0.01 ether
     },
     137: {
         name: "polygon",
