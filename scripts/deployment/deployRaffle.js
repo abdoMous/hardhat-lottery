@@ -28,11 +28,9 @@ async function deployRaffle(chainId) {
         vrfCoordinatorAddress = networkConfig[chainId]["vrfCoordinator"]
     }
 
-    const { keyHash } = networkConfig[chainId]
+    const { raffleEntranceFee, keyHash, interval } = networkConfig[chainId]
+
     const raffleFactory = await ethers.getContractFactory("Raffle")
-
-    const { raffleEntranceFee, interval } = networkConfig[chainId]
-
     const arguments = [subscriptionId, vrfCoordinatorAddress, keyHash, raffleEntranceFee, interval]
 
     const raffle = await raffleFactory.deploy(...arguments)
