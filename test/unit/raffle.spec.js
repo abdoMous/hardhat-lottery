@@ -12,7 +12,7 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
           ethers.utils.Logger.setLogLevel(ethers.utils.Logger.levels.ERROR)
 
           async function deployRaffleFixture() {
-              const [deployer] = await ethers.getSigners()
+              const [deployer, player1, player2] = await ethers.getSigners()
               const chainId = network.config.chainId
               let VRFCoordinatorV2Mock
 
@@ -52,10 +52,19 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
               const raffle = await raffleFactory.deploy(...arguments)
 
               if (chainId == 31337) {
-                  VRFCoordinatorV2Mock.addConsumer(subscriptionId, raffle.address)
+                  await VRFCoordinatorV2Mock.addConsumer(subscriptionId, raffle.address)
               }
 
-              return { raffle, raffleEntranceFee, chainId, interval, vrfCoordinatorV2Mock }
+              return {
+                  raffle,
+                  raffleEntranceFee,
+                  chainId,
+                  interval,
+                  VRFCoordinatorV2Mock,
+                  deployer,
+                  player1,
+                  player2,
+              }
           }
 
           describe("constructor", async function () {
@@ -207,6 +216,79 @@ const { developmentChains, networkConfig } = require("../../helper-hardhat-confi
               })
           })
           describe("#fulfillRandomWords", async function () {
-              it("can be called after performupkeep", async function () {})
+              it("can only be called after performupkeep", async function () {
+                  const { raffle, raffleEntranceFee, VRFCoordinatorV2Mock } = await loadFixture(
+                      deployRaffleFixture
+                  )
+                  await raffle.enterRaffle({ value: raffleEntranceFee })
+                  const interval = await raffle.getInterval()
+                  await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
+                  await network.provider.request({ method: "evm_mine", params: [] })
+
+                  await expect(
+                      VRFCoordinatorV2Mock.fulfillRandomWords(0, raffle.address)
+                  ).to.be.revertedWith("nonexistent request")
+                  await expect(
+                      VRFCoordinatorV2Mock.fulfillRandomWords(1, raffle.address) // reverts if not fulfilled
+                  ).to.be.revertedWith("nonexistent request")
+              })
+
+              it("pick a winner, resets, and sends mony", async function () {
+                  const {
+                      raffle,
+                      raffleEntranceFee,
+                      deployer,
+                      player1,
+                      player2,
+                      VRFCoordinatorV2Mock,
+                  } = await loadFixture(deployRaffleFixture)
+
+                  const entranceFee = raffle.getEntranceFee()
+
+                  await raffle.enterRaffle({ value: raffleEntranceFee })
+                  await raffle.connect(player1).enterRaffle({ value: raffleEntranceFee })
+                  await raffle.connect(player2).enterRaffle({ value: raffleEntranceFee })
+
+                  const startingTimeStamp = await raffle.getLastTimeStamp()
+
+                  const interval = await raffle.getInterval()
+                  await network.provider.send("evm_increaseTime", [interval.toNumber() + 1])
+                  await network.provider.request({ method: "evm_mine", params: [] })
+
+                  await new Promise(async function (resolve, reject) {
+                      raffle.once("WinnerPicked", async function () {
+                          console.log("WinnerPicked event fired!")
+                          try {
+                              const recentWinner = await raffle.getRecentWinner()
+                              const raffleState = await raffle.getRaffleState()
+                              const winnerBalance = await player2.getBalance()
+                              const endingTimeStamp = await raffle.getLastTimeStamp()
+                              await expect(raffle.getPlayer(0)).to.be.reverted
+                              assert.equal(recentWinner.toString(), player2.address)
+                              assert.equal(raffleState, 0)
+                              assert.equal(
+                                  winnerBalance.toString(),
+                                  startingBalance
+                                      .add(raffleEntranceFee)
+                                      .add(raffleEntranceFee)
+                                      .add(raffleEntranceFee)
+                                      .toString()
+                              )
+                              assert(endingTimeStamp > startingTimeStamp)
+                              resolve()
+                          } catch (e) {
+                              reject(e)
+                          }
+                      })
+
+                      const transaction = await raffle.performUpkeep("0x")
+                      const transactionReceipt = await transaction.wait(1)
+                      const startingBalance = await player2.getBalance()
+                      await VRFCoordinatorV2Mock.fulfillRandomWords(
+                          transactionReceipt.events[1].args.requestId,
+                          raffle.address
+                      )
+                  })
+              })
           })
       })
