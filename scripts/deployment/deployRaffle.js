@@ -1,4 +1,8 @@
 const { ethers, network, run } = require("hardhat")
+const fs = require("fs")
+
+const FRONTEND_ADDRESSES_FILE = "../nextjs-lottery/constants/contractAddresses.json"
+const FRONTEND_ABI_FILE = "../nextjs-lottery/constants/abi.json"
 
 const {
     developmentChains,
@@ -51,8 +55,31 @@ async function deployRaffle(chainId) {
     }
 
     if (chainId == 31337) {
-        VRFCoordinatorV2Mock.addConsumer(subscriptionId, raffle.address)
+        await VRFCoordinatorV2Mock.addConsumer(subscriptionId, raffle.address)
     }
+
+    if (process.env.UPDATE_FRONT_END) {
+        console.log("updating contractAddresses.json and abi.jsaon")
+        await updateContractAddresses(raffle, chainId)
+        await updateAbi(raffle)
+    }
+}
+
+async function updateContractAddresses(contract, chainId) {
+    const currrentAddresses = JSON.parse(fs.readFileSync(FRONTEND_ADDRESSES_FILE, "utf8"))
+    if (chainId in currrentAddresses) {
+        if (!currrentAddresses[chainId]) {
+            currrentAddresses[chainId].push(contract.address)
+        }
+    } else {
+        currrentAddresses[chainId] = [contract.address]
+    }
+
+    fs.writeFileSync(FRONTEND_ADDRESSES_FILE, JSON.stringify(currrentAddresses))
+}
+
+async function updateAbi(contract) {
+    fs.writeFileSync(FRONTEND_ABI_FILE, contract.interface.format(ethers.utils.FormatTypes.json))
 }
 
 module.exports = {

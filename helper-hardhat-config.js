@@ -7,6 +7,7 @@ const networkConfig = {
         fundAmount: "1000000000000000000",
         automationUpdateInterval: "30",
         interval: "30",
+        raffleEntranceFee: "10000000000000000", // 0.01 ether
     },
     31337: {
         name: "localhost",
