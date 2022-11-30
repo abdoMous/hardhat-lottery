@@ -22,6 +22,7 @@ async function deployRaffle(chainId) {
         const VRFCoordinatorV2MockFactory = await ethers.getContractFactory("VRFCoordinatorV2Mock")
         VRFCoordinatorV2Mock = await VRFCoordinatorV2MockFactory.deploy(BASE_FEE, GAS_PRICE_LINK)
         vrfCoordinatorAddress = VRFCoordinatorV2Mock.address
+        console.log("vrfCoordinatorAddress=", vrfCoordinatorAddress)
         const fundAmount = networkConfig[chainId]["fundAmount"] || "1000000000000000000"
         const transaction = await VRFCoordinatorV2Mock.createSubscription()
         const transactionReceipt = await transaction.wait(1)
